@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>写评论 - CommentFree</title>
+    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="在CommentFree上写评论，分享你的想法和图片">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✍️ 写评论</h1>
+            <p>分享你的想法和图片</p>
+        </div>
+        
+        <div class="content">
+            <form id="commentForm" enctype="multipart/form-data">
+                <!-- 文字内容 -->
+                <div class="form-group">
+                    <label for="content">
+                        评论内容 <span style="color: #e74c3c;">*</span>
+                        <span style="font-weight: normal; color: #666;">(至少50字)</span>
+                    </label>
+                    <textarea 
+                        id="content" 
+                        name="content" 
+                        class="form-control" 
+                        placeholder="请输入你的评论内容，至少50字..."
+                        required
+                        rows="6"
+                    ></textarea>
+                    <div id="contentCounter" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                        当前字数: <span id="currentCount">0</span> / 最少50字
+                    </div>
+                </div>
+                
+                <!-- 图片上传 -->
+                <div class="form-group">
+                    <label for="images">
+                        图片上传 
+                        <span style="font-weight: normal; color: #666;">(最多9张，每张≤1MB)</span>
+                    </label>
+                    <div class="file-input">
+                        <input 
+                            type="file" 
+                            id="images" 
+                            name="images" 
+                            multiple 
+                            accept="image/*"
+                            onchange="handleFileSelect(event)"
+                        >
+                        <label for="images" class="file-input-label" id="fileLabel">
+                            📁 点击选择图片或拖拽到此处<br>
+                            <span style="font-size: 0.9em; color: #888;">支持 JPG, PNG, GIF, WebP 格式</span>
+                        </label>
+                    </div>
+                    
+                    <div id="imagePreview" class="image-preview hidden"></div>
+                </div>
+                
+                <!-- 提交按钮 -->
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="button" class="btn btn-secondary" onclick="goBack()">
+                        返回首页
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <span id="submitBtnText">发布评论</span>
+                        <span id="submitBtnLoading" class="loading hidden"></span>
+                    </button>
+                </div>
+            </form>
+            
+            <!-- 消息显示区域 -->
+            <div id="message" class="hidden"></div>
+            
+            <!-- 成功发布后的显示区域 -->
+            <div id="successResult" class="hidden">
+                <div class="post-container">
+                    <h3 style="color: #28a745; margin-bottom: 20px; text-align: center;">
+                        🎉 评论发布成功！
+                    </h3>
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div style="font-size: 1.2em; margin-bottom: 10px;">
+                            你的评论ID是：
+                        </div>
+                        <div id="generatedId" style="font-size: 2em; font-weight: bold; color: #667eea; margin-bottom: 20px;"></div>
+                        <div style="color: #666; margin-bottom: 20px;">
+                            请保存这个ID，以便将来查看你的评论
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button class="btn btn-primary" onclick="viewMyComment()">
+                            查看我的评论
+                        </button>
+                        <button class="btn btn-secondary" onclick="writeAnother()">
+                            再写一条
+                        </button>
+                        <button class="btn btn-secondary" onclick="goHome()">
+                            回到首页
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 CommentFree. 自由分享，创造价值.</p>
+        </div>
+    </div>
+    
+    <script>
+        let selectedFiles = [];
+        let generatedCommentId = '';
+        
+        // 文字计数
+        document.getElementById('content').addEventListener('input', function() {
+            const content = this.value;
+            const count = content.length;
+            const currentCountElement = document.getElementById('currentCount');
+            const counterDiv = document.getElementById('contentCounter');
+            
+            currentCountElement.textContent = count;
+            
+            if (count >= 50) {
+                counterDiv.style.color = '#28a745';
+            } else {
+                counterDiv.style.color = '#e74c3c';
+            }
+        });
+        
+        // 文件选择处理
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            addFiles(files);
+        }
+        
+        // 添加文件
+        function addFiles(files) {
+            for (const file of files) {
+                if (selectedFiles.length >= 9) {
+                    showMessage('最多只能上传9张图片', 'error');
+                    break;
+                }
+                
+                if (file.size > 1024 * 1024) { // 1MB
+                    showMessage(`文件 "${file.name}" 超过1MB限制`, 'error');
+                    continue;
+                }
+                
+                if (!file.type.startsWith('image/')) {
+                    showMessage(`文件 "${file.name}" 不是图片格式`, 'error');
+                    continue;
+                }
+                
+                selectedFiles.push(file);
+            }
+            
+            updateImagePreview();
+            updateFileLabel();
+        }
+        
+        // 更新图片预览
+        function updateImagePreview() {
+            const previewDiv = document.getElementById('imagePreview');
+            
+            if (selectedFiles.length === 0) {
+                previewDiv.classList.add('hidden');
+                return;
+            }
+            
+            previewDiv.classList.remove('hidden');
+            previewDiv.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.alt = file.name;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.onclick = () => removeFile(index);
+                
+                previewItem.appendChild(img);
+                previewItem.appendChild(removeBtn);
+                previewDiv.appendChild(previewItem);
+            });
+        }
+        
+        // 移除文件
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateImagePreview();
+            updateFileLabel();
+        }
+        
+        // 更新文件标签
+        function updateFileLabel() {
+            const label = document.getElementById('fileLabel');
+            if (selectedFiles.length === 0) {
+                label.innerHTML = `
+                    📁 点击选择图片或拖拽到此处<br>
+                    <span style="font-size: 0.9em; color: #888;">支持 JPG, PNG, GIF, WebP 格式</span>
+                `;
+            } else {
+                label.innerHTML = `
+                    已选择 ${selectedFiles.length} 张图片<br>
+                    <span style="font-size: 0.9em; color: #888;">点击继续添加图片 (最多9张)</span>
+                `;
+            }
+        }
+        
+        // 拖拽上传
+        const fileLabel = document.getElementById('fileLabel');
+        
+        fileLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileLabel.classList.add('dragover');
+        });
+        
+        fileLabel.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileLabel.classList.remove('dragover');
+        });
+        
+        fileLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileLabel.classList.remove('dragover');
+            
+            const files = Array.from(e.dataTransfer.files);
+            addFiles(files);
+        });
+        
+        // 表单提交
+        document.getElementById('commentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const content = document.getElementById('content').value.trim();
+            const submitBtn = document.getElementById('submitBtn');
+            const submitBtnText = document.getElementById('submitBtnText');
+            const submitBtnLoading = document.getElementById('submitBtnLoading');
+            
+            // 验证内容长度
+            if (content.length < 50) {
+                showMessage('评论内容不能少于50字', 'error');
+                return;
+            }
+            
+            // 显示加载状态
+            submitBtn.disabled = true;
+            submitBtnText.classList.add('hidden');
+            submitBtnLoading.classList.remove('hidden');
+            
+            try {
+                // 创建FormData
+                const formData = new FormData();
+                formData.append('content', content);
+                
+                // 添加图片文件
+                selectedFiles.forEach(file => {
+                    formData.append('images', file);
+                });
+                
+                // 发送请求
+                const response = await fetch('/api/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    generatedCommentId = result.data.id;
+                    showSuccess();
+                    
+                    // 保存到本地存储
+                    saveToLocalStorage();
+                } else {
+                    showMessage(result.message || '发布失败', 'error');
+                }
+            } catch (error) {
+                console.error('发布失败:', error);
+                showMessage('网络错误，请稍后重试', 'error');
+            } finally {
+                // 恢复按钮状态
+                submitBtn.disabled = false;
+                submitBtnText.classList.remove('hidden');
+                submitBtnLoading.classList.add('hidden');
+            }
+        });
+        
+        // 显示成功结果
+        function showSuccess() {
+            const form = document.getElementById('commentForm');
+            const successDiv = document.getElementById('successResult');
+            const idElement = document.getElementById('generatedId');
+            
+            form.classList.add('hidden');
+            successDiv.classList.remove('hidden');
+            idElement.textContent = generatedCommentId;
+            
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // 保存到本地存储
+        function saveToLocalStorage() {
+            const history = JSON.parse(localStorage.getItem('commentHistory') || '[]');
+            history.unshift({
+                id: generatedCommentId,
+                content: document.getElementById('content').value.trim(),
+                timestamp: new Date().toISOString()
+            });
+            
+            // 只保留最近20条记录
+            if (history.length > 20) {
+                history.splice(20);
+            }
+            
+            localStorage.setItem('commentHistory', JSON.stringify(history));
+        }
+        
+        // 查看我的评论
+        function viewMyComment() {
+            window.location.href = `index.html?id=${encodeURIComponent(generatedCommentId)}`;
+        }
+        
+        // 再写一条
+        function writeAnother() {
+            location.reload();
+        }
+        
+        // 回到首页
+        function goHome() {
+            window.location.href = 'index.html';
+        }
+        
+        // 返回首页
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+        
+        // 显示消息
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            
+            // 滚动到消息位置
+            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // 3秒后自动隐藏info消息
+            if (type === 'info') {
+                setTimeout(() => {
+                    messageDiv.classList.add('hidden');
+                }, 3000);
+            }
+        }
+        
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载历史记录（可选功能）
+            loadHistory();
+        });
+        
+        // 加载历史记录
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('commentHistory') || '[]');
+            if (history.length > 0) {
+                console.log('历史评论记录:', history);
+                // 可以在这里添加显示历史记录的UI
+            }
+        }
+    </script>
+</body>
+</html>

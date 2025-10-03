@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查看评论 - CommentFree</title>
+    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="在CommentFree上查看评论">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👁️ 查看评论</h1>
+            <p>分享的内容，共同的回忆</p>
+        </div>
+        
+        <div class="content">
+            <!-- 导航栏 -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <a href="index.html" class="btn btn-secondary">返回首页</a>
+                <a href="write.html" class="btn btn-primary">写评论</a>
+            </div>
+            
+            <!-- 加载状态 -->
+            <div id="loadingDiv" class="hidden" style="text-align: center; padding: 40px;">
+                <div class="loading" style="margin: 0 auto 20px;"></div>
+                <p>正在加载评论...</p>
+            </div>
+            
+            <!-- 错误消息 -->
+            <div id="errorMessage" class="hidden"></div>
+            
+            <!-- 评论显示区域 -->
+            <div id="commentDisplay" class="hidden"></div>
+            
+            <!-- 空状态 -->
+            <div id="emptyState" class="hidden" style="text-align: center; padding: 40px;">
+                <div style="font-size: 4em; margin-bottom: 20px;">🔍</div>
+                <h3 style="color: #667eea; margin-bottom: 15px;">没有指定评论ID</h3>
+                <p style="color: #666; margin-bottom: 30px;">
+                    请在URL中添加?id=评论ID参数，或者返回首页搜索评论
+                </p>
+                <a href="index.html" class="btn btn-primary">返回首页</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 CommentFree. 每个想法都值得被看见.</p>
+        </div>
+    </div>
+    
+    <!-- 图片查看模态框 -->
+    <div id="imageModal" class="hidden" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        cursor: pointer;
+    ">
+        <div style="position: relative; max-width: 95%; max-height: 95%;">
+            <img id="modalImage" style="
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+            ">
+            <button id="closeModal" style="
+                position: absolute;
+                top: -40px;
+                right: 0;
+                background: rgba(255, 255, 255, 0.9);
+                border: none;
+                border-radius: 50%;
+                width: 32px;
+                height: 32px;
+                cursor: pointer;
+                font-size: 18px;
+                color: #333;
+            ">×</button>
+        </div>
+    </div>
+    
+    <script>
+        let currentCommentId = '';
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePage();
+        });
+        
+        // 初始化页面
+        function initializePage() {
+            // 从URL获取评论ID
+            const urlParams = new URLSearchParams(window.location.search);
+            const commentId = urlParams.get('id');
+            
+            if (commentId) {
+                currentCommentId = commentId;
+                loadComment(commentId);
+            } else {
+                showEmptyState();
+            }
+            
+            // 初始化模态框事件
+            initializeModal();
+        }
+        
+        // 加载评论
+        async function loadComment(commentId) {
+            showLoading();
+            
+            try {
+                const response = await fetch(`/api/view/${encodeURIComponent(commentId)}`);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    displayComment(result.data);
+                    updatePageTitle(result.data.id);
+                } else {
+                    showError(result.message || '评论不存在');
+                }
+            } catch (error) {
+                console.error('加载评论失败:', error);
+                showError('网络错误，请稍后重试');
+            }
+        }
+        
+        // 显示加载状态
+        function showLoading() {
+            hideAllSections();
+            document.getElementById('loadingDiv').classList.remove('hidden');
+        }
+        
+        // 显示错误
+        function showError(message) {
+            hideAllSections();
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.className = 'message error';
+            errorDiv.textContent = message;
+        }
+        
+        // 显示空状态
+        function showEmptyState() {
+            hideAllSections();
+            document.getElementById('emptyState').classList.remove('hidden');
+        }
+        
+        // 隐藏所有状态区域
+        function hideAllSections() {
+            document.getElementById('loadingDiv').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+            document.getElementById('commentDisplay').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+        }
+        
+        // 显示评论内容
+        function displayComment(data) {
+            hideAllSections();
+            
+            const displayDiv = document.getElementById('commentDisplay');
+            const createdAt = new Date(data.created_at).toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            let imagesHtml = '';
+            if (data.images && data.images.length > 0) {
+                imagesHtml = `
+                    <div class="post-images">
+                        ${data.images.map(img => `
+                            <div class="post-image">
+                                <img src="/${img}" alt="评论图片" onclick="openImageModal('/${img}')" loading="lazy">
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            displayDiv.innerHTML = `
+                <div class="post-container">
+                    <div class="post-header">
+                        <div class="post-id">ID: ${escapeHtml(data.id)}</div>
+                        <div class="post-meta">
+                            📅 ${createdAt} | 
+                            👁️ ${data.view_count} 次浏览 | 
+                            ❤️ ${data.like_count} 次点赞
+                        </div>
+                    </div>
+                    
+                    <div class="post-content">${escapeHtml(data.content)}</div>
+                    
+                    ${imagesHtml}
+                    
+                    <div class="post-actions">
+                        <button class="action-btn like-btn" onclick="likeComment('${escapeHtml(data.id)}')">
+                            ❤️ 点赞 (<span id="likeCount">${data.like_count}</span>)
+                        </button>
+                        <button class="action-btn" onclick="shareComment('${escapeHtml(data.id)}')">
+                            🔗 分享
+                        </button>
+                        <button class="action-btn" onclick="copyCommentId('${escapeHtml(data.id)}')">
+                            📋 复制ID
+                        </button>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e8ecf4; text-align: center;">
+                        <a href="write.html" class="btn btn-primary" style="margin-right: 10px;">
+                            ✍️ 我也要写评论
+                        </a>
+                        <a href="index.html" class="btn btn-secondary">
+                            🏠 返回首页
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            displayDiv.classList.remove('hidden');
+        }
+        
+        // 点赞评论
+        async function likeComment(commentId) {
+            try {
+                const response = await fetch(`/api/like/${encodeURIComponent(commentId)}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // 更新点赞数
+                    const likeCountElement = document.getElementById('likeCount');
+                    if (likeCountElement) {
+                        const currentCount = parseInt(likeCountElement.textContent);
+                        likeCountElement.textContent = currentCount + 1;
+                    }
+                    
+                    // 添加点赞动画效果
+                    const likeBtn = document.querySelector('.like-btn');
+                    if (likeBtn) {
+                        likeBtn.classList.add('liked');
+                        
+                        // 显示点赞成功提示
+                        showToast('👍 点赞成功！');
+                        
+                        // 1秒后移除样式
+                        setTimeout(() => {
+                            likeBtn.classList.remove('liked');
+                        }, 1000);
+                    }
+                } else {
+                    showToast('❌ 点赞失败', 'error');
+                }
+            } catch (error) {
+                console.error('点赞失败:', error);
+                showToast('❌ 网络错误，请稍后重试', 'error');
+            }
+        }
+        
+        // 分享评论
+        async function shareComment(commentId) {
+            const url = `${window.location.origin}/view.html?id=${encodeURIComponent(commentId)}`;
+            
+            try {
+                if (navigator.share) {
+                    // 使用Web Share API
+                    await navigator.share({
+                        title: `CommentFree - 评论 ${commentId}`,
+                        text: '查看这条有趣的评论',
+                        url: url
+                    });
+                } else {
+                    // 复制到剪贴板
+                    await navigator.clipboard.writeText(url);
+                    showToast('🔗 链接已复制到剪贴板');
+                }
+            } catch (error) {
+                console.error('分享失败:', error);
+                // 备用方案：显示分享链接
+                prompt('复制下面的链接来分享这条评论:', url);
+            }
+        }
+        
+        // 复制评论ID
+        async function copyCommentId(commentId) {
+            try {
+                await navigator.clipboard.writeText(commentId);
+                showToast('📋 评论ID已复制');
+            } catch (error) {
+                console.error('复制失败:', error);
+                prompt('复制评论ID:', commentId);
+            }
+        }
+        
+        // 显示toast提示
+        function showToast(message, type = 'success') {
+            // 创建toast元素
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'error' ? '#e74c3c' : '#28a745'};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                z-index: 1001;
+                font-weight: 500;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+            `;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            // 显示动画
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // 自动隐藏
+            setTimeout(() => {
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+        
+        // 初始化图片模态框
+        function initializeModal() {
+            const modal = document.getElementById('imageModal');
+            const closeBtn = document.getElementById('closeModal');
+            
+            // 点击关闭按钮
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeImageModal();
+            });
+            
+            // 点击模态框背景关闭
+            modal.addEventListener('click', closeImageModal);
+            
+            // ESC键关闭
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeImageModal();
+                }
+            });
+        }
+        
+        // 打开图片模态框
+        function openImageModal(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            
+            modalImage.src = src;
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        }
+        
+        // 关闭图片模态框
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = ''; // 恢复滚动
+        }
+        
+        // 更新页面标题
+        function updatePageTitle(commentId) {
+            document.title = `评论 ${commentId} - CommentFree`;
+        }
+        
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 监听浏览器后退/前进
+        window.addEventListener('popstate', function(event) {
+            initializePage();
+        });
+    </script>
+</body>
+</html>
