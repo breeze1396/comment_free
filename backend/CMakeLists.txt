@@ -26,7 +26,7 @@ if(WIN32)
 else()
     # Linux/macOS平台：使用pkg-config
     find_package(PkgConfig REQUIRED)
-    find_package(Boost REQUIRED COMPONENTS system filesystem json)
+    find_package(Boost REQUIRED COMPONENTS system json)
     pkg_check_modules(PQXX REQUIRED libpqxx)
 endif()
 
@@ -95,8 +95,6 @@ endif()
 # 设置输出名称
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "commentfree_server")
 
-# 安装规则
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 # 打印配置信息
 message(STATUS "=== CommentFree Backend Configuration ===")

@@ -1,5 +1,6 @@
 #include "routes.hpp"
 #include "utils.hpp"
+#include "http_server.hpp"
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
@@ -43,7 +44,7 @@ http::message_generator RouteHandler::handle_request(
     }
     
     // 静态文件服务
-    return serve_file(req, target);
+    return serve_file(req, target, doc_root);
 }
 
 http::response<http::string_body> RouteHandler::handle_api_submit(const http::request<http::string_body>& req) {
@@ -170,10 +171,17 @@ http::response<http::string_body> RouteHandler::handle_api_like(const std::strin
 template<class Body, class Allocator>
 http::message_generator RouteHandler::serve_file(
     const http::request<Body, http::basic_fields<Allocator>>& req,
-    const std::string& path) {
+    const std::string& path,
+    const std::string& doc_root) {
     
     // 处理路径
     std::string target = path;
+
+    size_t query_pos = target.find('?');
+    if (query_pos != std::string::npos) {
+        target = target.substr(0, query_pos);
+    }
+
     if (target == "/") {
         target = "/index.html";
     }
@@ -188,7 +196,7 @@ http::message_generator RouteHandler::serve_file(
     if (target.starts_with("uploads/")) {
         full_path = target;  // uploads目录直接访问
     } else {
-        full_path = "frontend/" + target;  // 前端文件
+        full_path = doc_root + "/" + target;  // 前端文件
     }
     
     // 读取文件
@@ -314,7 +322,7 @@ http::response<http::string_body> RouteHandler::not_found(const std::string& tar
     http::response<http::string_body> res{http::status::not_found, 11};
     res.set(http::field::server, "CommentFree/1.0");
     res.set(http::field::content_type, "application/json");
-    res.body() = utils::JsonUtils::create_error_response("资源不存在: " + target);
+    res.body() = utils::JsonUtils::create_error_response("resource not found: " + target);
     res.prepare_payload();
     add_cors_headers(res);
     return res;
@@ -355,6 +363,7 @@ template http::message_generator RouteHandler::handle_request<http::string_body,
 
 template http::message_generator RouteHandler::serve_file<http::string_body, std::allocator<char>>(
     const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req,
-    const std::string& path);
+    const std::string& path,
+    const std::string& doc_root);
 
 } // namespace routes

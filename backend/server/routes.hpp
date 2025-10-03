@@ -35,7 +35,8 @@ private:
     template<class Body, class Allocator>
     http::message_generator serve_file(
         const http::request<Body, http::basic_fields<Allocator>>& req,
-        const std::string& path);
+        const std::string& path,
+        const std::string& doc_root);
     
     // 辅助函数
     std::string extract_post_id_from_path(const std::string& path);

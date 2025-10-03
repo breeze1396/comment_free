@@ -5,10 +5,11 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <filesystem>
+#include <iostream>
 
 namespace utils {
 
-// 预定义的单词列表，用于生成易记ID
 const std::vector<std::string> IdGenerator::words = {
     "apple", "beach", "cloud", "dream", "eagle", "flame", "grace", "happy",
     "ideal", "joker", "knife", "light", "magic", "night", "ocean", "peace",
@@ -32,11 +33,11 @@ std::string IdGenerator::generate() {
 
 bool FileHandler::validate_file_size(const std::string& filepath, size_t max_size) {
     try {
-        boost::filesystem::path p(filepath);
-        if (!boost::filesystem::exists(p)) {
+        std::filesystem::path p(filepath);
+        if (!std::filesystem::exists(p)) {
             return false;
         }
-        return boost::filesystem::file_size(p) <= max_size;
+        return std::filesystem::file_size(p) <= max_size;
     } catch (const std::exception&) {
         return false;
     }
@@ -96,12 +97,13 @@ std::string FileHandler::save_uploaded_file(const std::string& content, const st
 
 bool FileHandler::ensure_directory(const std::string& path) {
     try {
-        boost::filesystem::path dir(path);
-        if (!boost::filesystem::exists(dir)) {
-            return boost::filesystem::create_directories(dir);
+        std::filesystem::path dir(path);
+        if (!std::filesystem::exists(dir)) {
+            return std::filesystem::create_directories(dir);
         }
-        return boost::filesystem::is_directory(dir);
-    } catch (const std::exception&) {
+        return std::filesystem::is_directory(dir);
+    } catch (const std::exception& e) {
+        std::cout << "mkdir error: "<< "path=" << path << ", error=" << e.what() << std::endl;
         return false;
     }
 }

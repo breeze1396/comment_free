@@ -69,6 +69,8 @@ add_custom_target(clean-all
     COMMENT "Cleaning all build files..."
 )
 
+file(COPY ${CMAKE_SOURCE_DIR}/frontend DESTINATION ${CMAKE_BINARY_DIR})
+
 # 显示配置信息
 message(STATUS "")
 message(STATUS "=== CommentFree Project Configuration ===")
